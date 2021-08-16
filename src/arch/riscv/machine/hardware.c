@@ -280,6 +280,10 @@ static inline bool_t isIRQPending(void)
 static inline void maskInterrupt(bool_t disable, irq_t irq)
 {
     assert(IS_IRQ_VALID(irq));
+#if CONFIG_RISCV_NUM_VTIMERS > 0
+    if (irq >= INTERRUPT_VTIMER_START && irq <= INTERRUPT_VTIMER_END) return;
+#endif
+
     if (irq == KERNEL_TIMER_IRQ) {
         if (disable) {
             clear_sie_mask(BIT(SIE_STIE));
@@ -317,6 +321,7 @@ static inline void ackInterrupt(irq_t irq)
 #ifdef ENABLE_SMP_SUPPORT
     if (irq == irq_reschedule_ipi || irq == irq_remote_call_ipi) {
         ipi_clear_irq(irq);
+        sbi_clear_ipi();
     }
 #endif
 }

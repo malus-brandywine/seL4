@@ -11,7 +11,6 @@
 # including Isabelle/HOL specifications and correctness proofs.
 ##
 
-from __future__ import print_function, division
 import sys
 import os.path
 import optparse
@@ -19,7 +18,6 @@ import re
 import itertools
 import tempfile
 
-from six.moves import range
 from functools import reduce
 
 import lex

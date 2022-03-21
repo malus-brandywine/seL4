@@ -120,9 +120,9 @@ static irq_t handleVTimer(void)
     assert(vtimers[core_id].next != NUM_VTIMERS);
     irq_t irq = 0;
     if (vtimers[core_id].next == KERNEL_PREEMPT_VTIMER) {
-        irq = INTERRUPT_CORE_TIMER;
+        irq = KERNEL_TIMER_IRQ;
     } else {
-        irq = INTERRUPT_CORE_TIMER + core_id * CONFIG_RISCV_NUM_VTIMERS + vtimers[core_id].next;
+        irq = KERNEL_TIMER_IRQ + core_id * CONFIG_RISCV_NUM_VTIMERS + vtimers[core_id].next;
     }
     vtimers[core_id].cycles[vtimers[core_id].next] = vtimers[core_id].next_cycles = VTIMER_MAX_CYCLES;
 

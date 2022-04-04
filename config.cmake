@@ -137,9 +137,14 @@ if(DEFINED KernelDTSList AND (NOT "${KernelDTSList}" STREQUAL ""))
                 ${DTC_TOOL} -q -I dts -O dtb -o ${KernelDTBPath} ${KernelDTSIntermediate}
         )
         # Track the size of the DTB for downstream tools
+        if (CMAKE_HOST_APPLE)
+            set(STAT_ARGS "-f%z")
+        else()
+            set(STAT_ARGS "-c '%s'")
+        endif()
         execute_process(
             COMMAND
-                ${STAT_TOOL} -c '%s' ${KernelDTBPath}
+                ${STAT_TOOL} ${STAT_ARGS} ${KernelDTBPath}
             OUTPUT_VARIABLE KernelDTBSize
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )

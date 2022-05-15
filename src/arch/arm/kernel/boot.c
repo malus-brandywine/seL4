@@ -55,7 +55,7 @@ BOOT_CODE static bool_t arch_init_freemem(p_region_t ui_p_reg,
     }
 
     if (extra_device_p_reg.start) {
-        /* the dtb region could be empty */
+        /* the extra device region could be empty */
         reserved[index].start = (pptr_t) paddr_to_pptr(extra_device_p_reg.start);
         reserved[index].end = (pptr_t) paddr_to_pptr(extra_device_p_reg.end);
         index++;

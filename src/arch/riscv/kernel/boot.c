@@ -23,7 +23,7 @@ BOOT_BSS static volatile word_t node_boot_lock;
 #endif
 
 /* kernel image + [extra bootinfo] + user image */
-#define MAX_RESERVED 3
+#define MAX_RESERVED 4
 BOOT_BSS static region_t res_reg[MAX_RESERVED];
 
 BOOT_CODE cap_t create_mapped_it_frame_cap(cap_t pd_cap, pptr_t pptr, vptr_t vptr, asid_t asid, bool_t
@@ -51,8 +51,10 @@ BOOT_CODE cap_t create_mapped_it_frame_cap(cap_t pd_cap, pptr_t pptr, vptr_t vpt
     return cap;
 }
 
-BOOT_CODE static bool_t arch_init_freemem(region_t ui_reg, v_region_t it_v_reg,
+BOOT_CODE static bool_t arch_init_freemem(region_t ui_reg,
+                                          v_region_t it_v_reg,
                                           region_t dtb_reg,
+                                          region_t extra_device_p_reg,
                                           word_t extra_bi_size_bits)
 {
     // This looks a bit awkward as our symbols are a reference in the kernel image window, but
@@ -65,6 +67,13 @@ BOOT_CODE static bool_t arch_init_freemem(region_t ui_reg, v_region_t it_v_reg,
         /* optionally reserve the dtb region, as it could be empty */
         res_reg[index].start = dtb_reg.start;
         res_reg[index].end = dtb_reg.end;
+        index += 1;
+    }
+
+    if (extra_device_p_reg.start) {
+        /* optionally reserve the extra device region, as it could be empty */
+        res_reg[index].start = extra_device_p_reg.start;
+        res_reg[index].end = extra_device_p_reg.end;
         index += 1;
     }
 
@@ -173,7 +182,9 @@ static BOOT_CODE bool_t try_init_kernel(
     uint32_t pv_offset,
     vptr_t  v_entry,
     paddr_t dtb_addr_start,
-    paddr_t dtb_addr_end
+    paddr_t dtb_addr_end,
+    paddr_t extra_device_addr_start,
+    paddr_t extra_device_addr_end
 )
 {
     cap_t root_cnode_cap;
@@ -187,6 +198,9 @@ static BOOT_CODE bool_t try_init_kernel(
     region_t ui_reg = paddr_to_pptr_reg((p_region_t) {
         ui_p_reg_start, ui_p_reg_end
     });
+    region_t extra_device_p_reg = paddr_to_pptr_reg((p_region_t) {
+        extra_device_addr_start, extra_device_addr_end
+    });
     region_t dtb_reg;
     word_t extra_bi_size;
     pptr_t extra_bi_offset = 0;
@@ -195,6 +209,7 @@ static BOOT_CODE bool_t try_init_kernel(
     vptr_t ipcbuf_vptr;
     create_frames_of_region_ret_t create_frames_ret;
     create_frames_of_region_ret_t extra_bi_ret;
+    seL4_SlotPos first_untyped_slot;
 
     /* convert from physical addresses to userland vptrs */
     v_region_t ui_v_reg;
@@ -237,7 +252,7 @@ static BOOT_CODE bool_t try_init_kernel(
     init_plat();
 
     /* make the free memory available to alloc_region() */
-    if (!arch_init_freemem(ui_reg, it_v_reg, dtb_reg, extra_bi_size_bits)) {
+    if (!arch_init_freemem(ui_reg, it_v_reg, dtb_reg, extra_device_p_reg, extra_bi_size_bits)) {
         printf("ERROR: free memory management initialization failed\n");
         return false;
     }
@@ -374,11 +389,17 @@ static BOOT_CODE bool_t try_init_kernel(
 
     init_core_state(initial);
 
+    // @ivanv: comment
+    first_untyped_slot = ndks_boot.slot_pos_cur;
+    if (extra_device_addr_start) {
+        create_untypeds_for_region(root_cnode_cap, true, extra_device_p_reg, first_untyped_slot);
+    }
+
     /* convert the remaining free memory into UT objects and provide the caps */
     if (!create_untypeds(
             root_cnode_cap,
             boot_mem_reuse_reg,
-            ndks_boot.slot_pos_cur)) {
+            first_untyped_slot)) {
         printf("ERROR: could not create untypteds for kernel image boot memory\n");
         return false;
     }
@@ -404,19 +425,26 @@ BOOT_CODE VISIBLE void init_kernel(
     sword_t pv_offset,
     vptr_t  v_entry,
     paddr_t dtb_addr_p,
-    uint32_t dtb_size
+    uint64_t dtb_size,
 #ifdef ENABLE_SMP_SUPPORT
     ,
     word_t hart_id,
     word_t core_id
 #endif
+    paddr_t extra_device_addr_p,
+    uint64_t extra_device_size
 )
 {
     bool_t result;
     paddr_t dtb_end_p = 0;
+    paddr_t extra_device_end_p = 0;
 
     if (dtb_addr_p) {
         dtb_end_p = dtb_addr_p + dtb_size;
+    }
+
+    if (extra_device_addr_p) {
+        extra_device_end_p = extra_device_addr_p + extra_device_size;
     }
 
 #ifdef ENABLE_SMP_SUPPORT
@@ -427,7 +455,9 @@ BOOT_CODE VISIBLE void init_kernel(
                                  pv_offset,
                                  v_entry,
                                  dtb_addr_p,
-                                 dtb_end_p);
+                                 dtb_end_p,
+                                 extra_device_addr_p,
+                                 extra_device_end_p);
     } else {
         result = try_init_kernel_secondary_core(hart_id, core_id);
     }
@@ -437,7 +467,9 @@ BOOT_CODE VISIBLE void init_kernel(
                              pv_offset,
                              v_entry,
                              dtb_addr_p,
-                             dtb_end_p);
+                             dtb_end_p,
+                             extra_device_addr_p,
+                             extra_device_end_p);
 #endif
     if (!result) {
         fail("ERROR: kernel init failed");

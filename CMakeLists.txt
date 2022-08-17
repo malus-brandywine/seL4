@@ -36,6 +36,7 @@ RequireTool(BF_GEN_PATH bitfield_gen.py)
 RequireTool(HARDWARE_GEN_PATH hardware_gen.py)
 RequireTool(INVOCATION_ID_GEN_PATH invocation_header_gen.py)
 RequireTool(SYSCALL_ID_GEN_PATH syscall_header_gen.py)
+RequireTool(CONFIG_GEN_PATH config_gen.py)
 RequireTool(XMLLINT_PATH xmllint.sh)
 
 # Process the configuration scripts

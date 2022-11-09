@@ -1,0 +1,24 @@
+/*
+ * Copyright 2022, UNSW (ABN 41 687 119 230)
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
+/ {
+    chosen {
+        seL4,boot-cpu = <&{/cpus/cpu@0}>;
+        seL4,elfloader-devices =
+            "/bus@0/serial@c280000",
+            &{/psci};
+        seL4,kernel-devices =
+            "/bus@0/serial@c280000",
+            &{/bus@0/interrupt-controller@3881000},
+            &{/timer};
+    };
+
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0x00 0x80000000 0x00 0x70000000>;
+    };
+};
+

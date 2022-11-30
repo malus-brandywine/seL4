@@ -205,16 +205,11 @@ function(GenProofsBFTarget target_name target_file pbf_path pbf_target prunes de
 endfunction(GenProofsBFTarget)
 
 macro(cfg_str_add_disabled cfg_str name)
-    # include in liner files can't use double slash comments
-    list(APPEND ${cfg_str} "/* disabled: CONFIG_${name} */")
+    list(APPEND ${cfg_str} "CONFIG_${name};")
 endmacro()
 
 macro(cfg_str_add_define cfg_str name value comment)
-    set(cfg_define_str "#define CONFIG_${name}  ${value}")
-    if(NOT "${comment}" STREQUAL "")
-        # include in liner files can't use double slash comments
-        string(APPEND cfg_define_str "  /* ${comment} */")
-    endif()
+    set(cfg_define_str "CONFIG_${name},${value},${comment};")
     list(APPEND ${cfg_str} ${cfg_define_str})
 endmacro()
 
@@ -226,8 +221,8 @@ macro(cfg_str_add cfg_str name value)
     endif()
 endmacro()
 
-macro(cfg_str_add_as_1 cfg_str name var)
-    cfg_str_add_define(${cfg_str} ${name} "1" "${var}=${${var}}")
+macro(cfg_str_add_as_on cfg_str name var)
+    cfg_str_add_define(${cfg_str} ${name} "ON" "${var}=${${var}}")
 endmacro()
 
 # config_option(cmake_option_name c_config_name doc DEFAULT default [DEPENDS deps] [DEFAULT_DISABLE default_disabled])
@@ -290,7 +285,7 @@ function(config_option optionname configname doc)
     endif()
     set(local_config_string "${configure_string}")
     if(${optionname})
-        cfg_str_add_as_1(local_config_string ${configname} ${optionname})
+        cfg_str_add_as_on(local_config_string ${configname} ${optionname})
     else()
         cfg_str_add_disabled(local_config_string ${configname})
     endif()
@@ -307,7 +302,7 @@ macro(config_set optionname configname value)
         cfg_str_add_disabled(configure_string ${configname})
     else()
         if("${value}" STREQUAL "ON")
-            cfg_str_add_as_1(configure_string ${configname} ${optionname})
+            cfg_str_add_as_on(configure_string ${configname} ${optionname})
         else()
             # we have to quote ${value} here because it could be empty
             cfg_str_add(configure_string ${configname} "${value}")
@@ -490,7 +485,7 @@ function(config_choice optionname configname doc)
             # Check if this option is the one that is currently set
             if("${${optionname}}" STREQUAL "${option_value}")
                 set(${option_cache} ON CACHE INTERNAL "" FORCE)
-                cfg_str_add_as_1(local_config_string ${option_config} ${option_cache})
+                cfg_str_add_as_on(local_config_string ${option_config} ${option_cache})
                 set(found_current ON)
             else()
                 set(${option_cache} OFF CACHE INTERNAL "" FORCE)
@@ -523,7 +518,7 @@ function(config_choice optionname configname doc)
             # choice earlier, since we didn't know we were going to revert to
             # the default. So add the option setting here
             set(${first_cache} ON CACHE INTERNAL "" FORCE)
-            cfg_str_add_as_1(local_config_string ${first_config} ${first_cache})
+            cfg_str_add_as_on(local_config_string ${first_config} ${first_cache})
         endif()
     endif()
     # Save all possible options to an internal value.  This is to allow enumerating the options elsewhere.
@@ -544,18 +539,26 @@ endfunction(config_choice)
 # Which will allow you to do #include <${prefix}/gen_config.h>
 function(add_config_library prefix configure_template)
     set(config_dir "${CMAKE_CURRENT_BINARY_DIR}/gen_config")
-    set(config_file "${config_dir}/${prefix}/gen_config.h")
+    set(config_file_raw "${config_dir}/${prefix}/gen_config_raw")
+    set(config_file_c_header "${config_dir}/${prefix}/gen_config.h")
+    set(config_file_yaml "${config_dir}/${prefix}/gen_config.yaml")
     string(CONFIGURE "${configure_template}" config_header_contents)
-    # Turn the list of configurations into a valid C file of different lines
-    string(
-        REPLACE
-            ";"
-            "\n"
-            config_header_contents
-            "${config_header_contents}"
+    file(GENERATE OUTPUT "${config_file_raw}" CONTENT "${config_header_contents}")
+    add_custom_command(
+        OUTPUT ${config_file_c_header}
+        COMMAND
+            ${PYTHON3} "${CONFIG_GEN_PATH}" --config "${config_file_raw}" --type "c" --output "${config_file_c_header}"
+        DEPENDS "${CONFIG_GEN_PATH}"
+        COMMENT "Generating gen config header"
     )
-    file(GENERATE OUTPUT "${config_file}" CONTENT "\n#pragma once\n\n${config_header_contents}")
-    add_custom_target(${prefix}_Gen DEPENDS "${config_file}")
+    add_custom_command(
+        OUTPUT ${config_file_yaml}
+        COMMAND
+            ${PYTHON3} "${CONFIG_GEN_PATH}" --config "${config_file_raw}" --type "yaml" --output "${config_file_yaml}"
+        DEPENDS "${CONFIG_GEN_PATH}"
+        COMMENT "Generating gen config YAML"
+    )
+    add_custom_target(${prefix}_Gen DEPENDS "${config_file_c_header}" "${config_file_yaml}")
     add_library(${prefix}_Config INTERFACE)
     target_include_directories(${prefix}_Config INTERFACE "${config_dir}")
     add_dependencies(${prefix}_Config ${prefix}_Gen ${config_file})
@@ -563,7 +566,7 @@ function(add_config_library prefix configure_template)
     # Set a property on the library that is a list of the files we generated. This
     # allows custom build commands to easily get a file dependency list so they can
     # 'depend' upon this target easily
-    set_property(TARGET ${prefix}_Gen APPEND PROPERTY GENERATED_FILES "${config_file}")
+    set_property(TARGET ${prefix}_Gen APPEND PROPERTY GENERATED_FILES "${config_file_c_header}" "${config_file_yaml}")
 endfunction(add_config_library)
 
 macro(get_generated_files output target)

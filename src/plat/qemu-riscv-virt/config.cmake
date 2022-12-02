@@ -14,7 +14,7 @@ if(KernelPlatformQEMURiscVVirt)
     if("${KernelSel4Arch}" STREQUAL riscv64)
         declare_seL4_arch(riscv64)
     elseif("${KernelSel4Arch}" STREQUAL riscv32)
-        declare_seL4_arch(riscv32) # This is still untested
+        declare_seL4_arch(riscv32)
     else()
         fallback_declare_seL4_arch_default(riscv64)
     endif()
@@ -90,10 +90,17 @@ if(KernelPlatformQEMURiscVVirt)
             endif()
 
             if(NOT DEFINED QEMU_MEMORY)
-                # Having 3 GiB of memory as default seems a good trade-off. It's
-                # sufficient for test/demo systems, but still something the host
-                # can provide without running short on resources.
-                set(QEMU_MEMORY "3072")
+                if(KernelSel4ArchRiscV32)
+                    # Due to main memory having a starting address of 0x80000000, we are
+                    # limited to under 2 GiB as more than that would mean that you
+                    # could not be able to address all of main memory using a 32-bit word.
+                    set(QEMU_MEMORY "2047")
+                else()
+                    # Having 3 GiB of memory as default seems a good trade-off. It's
+                    # sufficient for test/demo systems, but still something the host
+                    # can provide without running short on resources.
+                    set(QEMU_MEMORY "3072")
+                endif()
             endif()
 
             if(KernelMaxNumNodes)

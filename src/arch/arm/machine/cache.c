@@ -60,11 +60,14 @@ void cleanCacheRange_RAM(vptr_t start, vptr_t end, paddr_t pstart)
         \<and> \<acute>pstart <= \<acute>pstart + (\<acute>end - \<acute>start), id)" */
 
     /* clean l1 to l2 */
-    cleanCacheRange_PoC(start, end, pstart);
+    // printf("Cleaning from L1 cache to L2. start is: 0x%lx, end: 0x%lx, pstart: 0x%lx\n", start, end, pstart);
+    // cleanCacheRange_PoC(start, end, pstart);
+    // printf("Finished\n");
 
     /* ensure cache operation completes before cleaning l2 */
     dsb();
 
+    // printf("Cleaning from L2 cache to RAM. start is: 0x%lx, end: 0x%lx, pstart: 0x%lx\n", start, end, pstart);
     /** GHOSTUPD: "((gs_get_assn cap_get_capSizeBits_'proc \<acute>ghost'state = 0
             \<or> \<acute>end - \<acute>start <= gs_get_assn cap_get_capSizeBits_'proc \<acute>ghost'state)
         \<and> \<acute>start <= \<acute>end
@@ -72,6 +75,8 @@ void cleanCacheRange_RAM(vptr_t start, vptr_t end, paddr_t pstart)
 
     /* now clean l2 to RAM */
     plat_cleanL2Range(pstart, pstart + (end - start));
+
+    // printf("Done with clean cache to RAM\n");
 }
 
 void cleanCacheRange_PoU(vptr_t start, vptr_t end, paddr_t pstart)

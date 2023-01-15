@@ -16,6 +16,7 @@ if(KernelPlatformXavier)
     config_set(KernelArmMach MACH "nvidia")
     list(APPEND KernelDTSList "tools/dts/xavier.dts")
     list(APPEND KernelDTSList "src/plat/xavier/overlay-xavier.dts")
+    # @ivanv: come back to these values
     declare_default_headers(
         TIMER_FREQUENCY 31250000
         MAX_IRQ 383

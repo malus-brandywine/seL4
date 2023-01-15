@@ -134,13 +134,21 @@ BOOT_CODE static bool_t insert_region(region_t reg)
 
 BOOT_CODE static pptr_t alloc_rootserver_obj(word_t size_bits, word_t n)
 {
+    printf("alloc_rootserver_obj| size_bits: 0x%lx, n: 0x%lx\n", size_bits, n);
     pptr_t allocated = rootserver_mem.start;
+    printf("allocated: 0x%lx, phys_addr: 0x%lx\n", allocated, pptr_to_paddr((void *)allocated));
     /* allocated memory must be aligned */
     assert(allocated % BIT(size_bits) == 0);
+    printf("alloc_rootserver_obj| here 1\n");
     rootserver_mem.start += (n * BIT(size_bits));
     /* we must not have run out of memory */
     assert(rootserver_mem.start <= rootserver_mem.end);
+    printf("alloc_rootserver_obj| here 2\n");
     memzero((void *) allocated, n * BIT(size_bits));
+    printf("alloc_rootserver_obj| here 3\n");
+
+    printf("alloc_rootserver_obj| about to return");
+
     return allocated;
 }
 
@@ -170,6 +178,7 @@ BOOT_CODE static word_t calculate_rootserver_size(v_region_t it_v_reg, word_t ex
 
 BOOT_CODE static void maybe_alloc_extra_bi(word_t cmp_size_bits, word_t extra_bi_size_bits)
 {
+    printf("maybe_alloc_extra_bi| cmp_size_bits: 0x%lx, extra_bi_size_bits: 0x%lx\n", cmp_size_bits, extra_bi_size_bits);
     if (extra_bi_size_bits >= cmp_size_bits && rootserver.extra_bi == 0) {
         rootserver.extra_bi = alloc_rootserver_obj(extra_bi_size_bits, 1);
     }
@@ -181,27 +190,37 @@ BOOT_CODE static void maybe_alloc_extra_bi(word_t cmp_size_bits, word_t extra_bi
 BOOT_CODE static void create_rootserver_objects(pptr_t start, v_region_t it_v_reg,
                                                 word_t extra_bi_size_bits)
 {
+    printf("create_rootserver_objects| start: 0x%lx, it_v_reg.start: 0x%lx, it_v_reg.end: 0x%lx, extra_bi_size_bits: 0x%lx\n", start, it_v_reg.start, it_v_reg.end, extra_bi_size_bits);
     /* the largest object the PD, the root cnode, or the extra boot info */
     word_t cnode_size_bits = CONFIG_ROOT_CNODE_SIZE_BITS + seL4_SlotBits;
     word_t max = rootserver_max_size_bits(extra_bi_size_bits);
+
+    printf("here 1\n");
 
     word_t size = calculate_rootserver_size(it_v_reg, extra_bi_size_bits);
     rootserver_mem.start = start;
     rootserver_mem.end = start + size;
 
+    printf("here 2\n");
     maybe_alloc_extra_bi(max, extra_bi_size_bits);
 
+    printf("here 2.5\n");
     /* the root cnode is at least 4k, so it could be larger or smaller than a pd. */
 #if (CONFIG_ROOT_CNODE_SIZE_BITS + seL4_SlotBits) > seL4_VSpaceBits
+    printf("here 2.75\n");
     rootserver.cnode = alloc_rootserver_obj(cnode_size_bits, 1);
+    printf("about to maybe_alloc_extra_bi\n");
     maybe_alloc_extra_bi(seL4_VSpaceBits, extra_bi_size_bits);
+    printf("about to alloc_rootserver_obj\n");
     rootserver.vspace = alloc_rootserver_obj(seL4_VSpaceBits, 1);
 #else
+    printf("here 2.8\n");
     rootserver.vspace = alloc_rootserver_obj(seL4_VSpaceBits, 1);
     maybe_alloc_extra_bi(cnode_size_bits, extra_bi_size_bits);
     rootserver.cnode = alloc_rootserver_obj(cnode_size_bits, 1);
 #endif
 
+    printf("here 3\n");
     /* at this point we are up to creating 4k objects - which is the min size of
      * extra_bi so this is the last chance to allocate it */
     maybe_alloc_extra_bi(seL4_PageBits, extra_bi_size_bits);
@@ -211,24 +230,29 @@ BOOT_CODE static void create_rootserver_objects(pptr_t start, v_region_t it_v_re
     compile_assert(invalid_BI_FRAME_SIZE_BITS, BI_FRAME_SIZE_BITS == seL4_PageBits);
     rootserver.boot_info = alloc_rootserver_obj(BI_FRAME_SIZE_BITS, 1);
 
+    printf("here 4\n");
     /* TCBs on aarch32 can be larger than page tables in certain configs */
 #if seL4_TCBBits >= seL4_PageTableBits
     rootserver.tcb = alloc_rootserver_obj(seL4_TCBBits, 1);
 #endif
 
+    printf("here 5\n");
     /* paging structures are 4k on every arch except aarch32 (1k) */
     word_t n = arch_get_n_paging(it_v_reg);
     rootserver.paging.start = alloc_rootserver_obj(seL4_PageTableBits, n);
     rootserver.paging.end = rootserver.paging.start + n * BIT(seL4_PageTableBits);
 
+    printf("here 6\n");
     /* for most archs, TCBs are smaller than page tables */
 #if seL4_TCBBits < seL4_PageTableBits
     rootserver.tcb = alloc_rootserver_obj(seL4_TCBBits, 1);
 #endif
 
+    printf("here 7\n");
 #ifdef CONFIG_KERNEL_MCS
     rootserver.sc = alloc_rootserver_obj(seL4_MinSchedContextBits, 1);
 #endif
+    printf("here 8\n");
     /* we should have allocated all our memory */
     assert(rootserver_mem.start == rootserver_mem.end);
 }
@@ -323,12 +347,15 @@ BOOT_CODE word_t calculate_extra_bi_size_bits(word_t extra_size)
 BOOT_CODE void populate_bi_frame(node_id_t node_id, word_t num_nodes,
                                  vptr_t ipcbuf_vptr, word_t extra_bi_size)
 {
+    printf("populate_bi_frame| clearing some memory\n");
+    printf("clearing vaddr: 0x%lx, paddr: 0x%lx, size: 0x%lx\n", rootserver.boot_info, pptr_to_paddr((void *)rootserver.boot_info), BIT(BI_FRAME_SIZE_BITS));
     /* clear boot info memory */
     clearMemory((void *)rootserver.boot_info, BI_FRAME_SIZE_BITS);
     if (extra_bi_size) {
         clearMemory((void *)rootserver.extra_bi,
                     calculate_extra_bi_size_bits(extra_bi_size));
     }
+    printf("populate_bi_frame| finished clearing some memory\n");
 
     /* initialise bootinfo-related global state */
     seL4_BootInfo *bi = BI_PTR(rootserver.boot_info);
@@ -832,6 +859,8 @@ BOOT_CODE bool_t init_freemem(word_t n_available, const p_region_t *available,
         avail_reg[i].start = ceiling_kernel_window(avail_reg[i].start);
     }
 
+    printf("seL4: here 1\n");
+
     word_t a = 0;
     word_t r = 0;
     /* Now iterate through the available regions, removing any reserved regions. */
@@ -876,6 +905,8 @@ BOOT_CODE bool_t init_freemem(word_t n_available, const p_region_t *available,
         }
     }
 
+    printf("seL4: here 2\n");
+
     for (; r < n_reserved; r++) {
         if (reserved[r].start < reserved[r].end) {
             reserve_region(pptr_to_paddr_reg(reserved[r]));
@@ -899,11 +930,14 @@ BOOT_CODE bool_t init_freemem(word_t n_available, const p_region_t *available,
     /* skip any empty regions */
     for (; i >= 0 && is_reg_empty(ndks_boot.freemem[i]); i--);
 
+    printf("seL4: here 3\n");
+
     /* try to grab the last available p region to create the root server objects
      * from. If possible, retain any left over memory as an extra p region */
     word_t size = calculate_rootserver_size(it_v_reg, extra_bi_size_bits);
     word_t max = rootserver_max_size_bits(extra_bi_size_bits);
     for (; i >= 0; i--) {
+        printf("== here, size is: 0x%lx, max is: 0x%lx\n", size, max);
         /* Invariant: both i and (i + 1) are valid indices in ndks_boot.freemem. */
         assert(i < ARRAY_SIZE(ndks_boot.freemem) - 1);
         /* Invariant; the region at index i is the current candidate.
@@ -925,7 +959,9 @@ BOOT_CODE bool_t init_freemem(word_t n_available, const p_region_t *available,
          * then we've found a region that fits the root server objects. */
         if (unaligned_start <= ndks_boot.freemem[i].end
             && start >= ndks_boot.freemem[i].start) {
+            printf("creating rootserver objects\n");
             create_rootserver_objects(start, it_v_reg, extra_bi_size_bits);
+            printf("finished creating rootserver objects\n");
             /* There may be leftovers before and after the memory we used. */
             /* Shuffle the after leftover up to the empty slot (i + 1). */
             ndks_boot.freemem[empty_index] = (region_t) {
@@ -936,6 +972,7 @@ BOOT_CODE bool_t init_freemem(word_t n_available, const p_region_t *available,
             ndks_boot.freemem[i].end = start;
             /* Regions i and (i + 1) are now well defined, ordered, disjoint,
              * and unallocated, so we can return successfully. */
+            printf("returning from init_freemem\n");
             return true;
         }
         /* Region i isn't big enough, so shuffle it up to slot (i + 1),

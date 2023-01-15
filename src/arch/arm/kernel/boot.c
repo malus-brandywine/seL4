@@ -108,9 +108,12 @@ BOOT_CODE static bool_t arch_init_freemem(p_region_t ui_p_reg,
     }
 
     /* avail_p_regs comes from the auto-generated code */
-    return init_freemem(ARRAY_SIZE(avail_p_regs), avail_p_regs,
+    int x = init_freemem(ARRAY_SIZE(avail_p_regs), avail_p_regs,
                         index, reserved,
                         it_v_reg, extra_bi_size_bits);
+    printf("Returned from init_freemem with: 0x%x\n", x);
+
+    return x;
 }
 
 
@@ -418,6 +421,7 @@ static BOOT_CODE bool_t try_init_kernel(
         return false;
     }
 
+    printf("seL4| create cnode\n");
     /* create the root cnode */
     root_cnode_cap = create_root_cnode();
     if (cap_get_capType(root_cnode_cap) == cap_null_cap) {
@@ -435,8 +439,10 @@ static BOOT_CODE bool_t try_init_kernel(
     /* initialise the SMMU and provide the SMMU control caps*/
     init_smmu(root_cnode_cap);
 #endif
+    printf("seL4| populate_bi_frame\n");
     populate_bi_frame(0, CONFIG_MAX_NUM_NODES, ipcbuf_vptr, extra_bi_size);
 
+    printf("seL4| dtb\n");
     /* put DTB in the bootinfo block, if present. */
     seL4_BootInfoHeader header;
     if (dtb_size > 0) {
@@ -470,12 +476,14 @@ static BOOT_CODE bool_t try_init_kernel(
 
     /* Construct an initial address space with enough virtual addresses
      * to cover the user image + ipc buffer and bootinfo frames */
+    printf("seL4| create init address space\n");
     it_pd_cap = create_it_address_space(root_cnode_cap, it_v_reg);
     if (cap_get_capType(it_pd_cap) == cap_null_cap) {
         printf("ERROR: address space creation for initial thread failed\n");
         return false;
     }
 
+    printf("seL4| create bootinfo frame cap\n");
     /* Create and map bootinfo frame cap */
     create_bi_frame_cap(
         root_cnode_cap,

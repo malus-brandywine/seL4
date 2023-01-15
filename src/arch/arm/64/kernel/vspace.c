@@ -420,6 +420,9 @@ static BOOT_CODE void map_it_pd_cap(cap_t vspace_cap, cap_t pd_cap)
     assert(pgde_pgde_pud_ptr_get_present(vspaceRoot));
     pud = paddr_to_pptr(pgde_pgde_pud_ptr_get_pud_base_address(vspaceRoot));
 #endif
+    printf("vspaceRoot: %p, pgde_ptr->words[0]: 0x%llx\n", vspaceRoot, ((pgde_t *)vspaceRoot)->words[0]);
+    printf("pud physical address: 0x%llx\n", pgde_pgde_pud_ptr_get_pud_base_address(vspaceRoot));
+    printf("pud + GET_UPUD_INDEX(vptr): %p, pud: %p\n", (void *)pud, (void *)(pud + GET_UPUD_INDEX(vptr)));
     *(pud + GET_UPUD_INDEX(vptr)) = pude_pude_pd_new(
                                         pptr_to_paddr(pd)
                                     );
@@ -428,13 +431,16 @@ static BOOT_CODE void map_it_pd_cap(cap_t vspace_cap, cap_t pd_cap)
 static BOOT_CODE cap_t create_it_pd_cap(cap_t vspace_cap, pptr_t pptr, vptr_t vptr, asid_t asid)
 {
     cap_t cap;
+    printf("creating PD, pptr: 0x%lx, vptr: 0x%lx\n", pptr, vptr);
     cap = cap_page_directory_cap_new(
               asid,                   /* capPDMappedASID */
               pptr,                   /* capPDBasePtr */
               1,                      /* capPDIsMapped */
               vptr                    /* capPDMappedAddress */
           );
+    printf("finished creating PD\n");
     map_it_pd_cap(vspace_cap, cap);
+    printf("finished mapping PD\n");
     return cap;
 }
 
@@ -447,13 +453,17 @@ static BOOT_CODE void map_it_pud_cap(cap_t vspace_cap, cap_t pud_cap)
 
     assert(cap_page_upper_directory_cap_get_capPUDIsMapped(pud_cap));
 
+    printf("Mapping PUD| pud: %p, vptr: 0x%lx, GET_PGD_INDEX(vptr): 0x%lx\n", pud, vptr, GET_PGD_INDEX(vptr));
     *(pgd + GET_PGD_INDEX(vptr)) = pgde_pgde_pud_new(
                                        pptr_to_paddr(pud));
+
+    printf("pdge.words[0]: 0x%llx\n", (pgd + GET_PGD_INDEX(vptr))->words[0]);
 }
 
 static BOOT_CODE cap_t create_it_pud_cap(cap_t vspace_cap, pptr_t pptr, vptr_t vptr, asid_t asid)
 {
     cap_t cap;
+    printf("creating PUD, pptr: 0x%lx, vptr: 0x%lx, PUD paddr: 0x%lx\n", pptr, vptr, pptr_to_paddr((void *)pptr));
     cap = cap_page_upper_directory_cap_new(
               asid,               /* capPUDMappedASID */
               pptr,               /* capPUDBasePtr */
@@ -476,12 +486,14 @@ BOOT_CODE word_t arch_get_n_paging(v_region_t it_v_reg)
 
 BOOT_CODE cap_t create_it_address_space(cap_t root_cnode_cap, v_region_t it_v_reg)
 {
+    printf("Entered create_it_address_space\n");
     cap_t      vspace_cap;
     vptr_t     vptr;
     seL4_SlotPos slot_pos_before;
     seL4_SlotPos slot_pos_after;
 
     /* create the PGD */
+    printf("Create the PGD\n");
     vspace_cap = cap_vtable_cap_new(
                      IT_ASID,        /* capPGDMappedASID */
                      rootserver.vspace, /* capPGDBasePtr   */
@@ -491,6 +503,7 @@ BOOT_CODE cap_t create_it_address_space(cap_t root_cnode_cap, v_region_t it_v_re
     write_slot(SLOT_PTR(pptr_of_cap(root_cnode_cap), seL4_CapInitThreadVSpace), vspace_cap);
 
 #ifndef AARCH64_VSPACE_S2_START_L1
+    printf("About to create PUDs\n");
     /* Create any PUDs needed for the user land image */
     for (vptr = ROUND_DOWN(it_v_reg.start, PGD_INDEX_OFFSET);
          vptr < it_v_reg.end;
@@ -500,15 +513,18 @@ BOOT_CODE cap_t create_it_address_space(cap_t root_cnode_cap, v_region_t it_v_re
         }
     }
 #endif
+    printf("About to create PDs\n");
     /* Create any PDs needed for the user land image */
     for (vptr = ROUND_DOWN(it_v_reg.start, PUD_INDEX_OFFSET);
          vptr < it_v_reg.end;
          vptr += BIT(PUD_INDEX_OFFSET)) {
+        printf("in loop, vptr: 0x%lx\n", vptr);
         if (!provide_cap(root_cnode_cap, create_it_pd_cap(vspace_cap, it_alloc_paging(), vptr, IT_ASID))) {
             return cap_null_cap_new();
         }
     }
 
+    printf("About to create PTs\n");
     /* Create any PTs needed for the user land image */
     for (vptr = ROUND_DOWN(it_v_reg.start, PD_INDEX_OFFSET);
          vptr < it_v_reg.end;
@@ -518,6 +534,7 @@ BOOT_CODE cap_t create_it_address_space(cap_t root_cnode_cap, v_region_t it_v_re
         }
     }
 
+    printf("Finished creating PTs\n");
     slot_pos_after = ndks_boot.slot_pos_cur;
     ndks_boot.bi_frame->userImagePaging = (seL4_SlotRegion) {
         slot_pos_before, slot_pos_after

@@ -45,9 +45,12 @@ void cleanInvalidateL1Caches(void);
 /* Cleaning memory before user-level access */
 static inline void clearMemory(word_t *ptr, word_t bits)
 {
+    // printf("memzero with ptr: 0x%p, size: 0x%lx\n", ptr, BIT(bits));
     memzero(ptr, BIT(bits));
+    // printf("memzero done\n");
     cleanCacheRange_RAM((word_t)ptr, (word_t)ptr + BIT(bits) - 1,
                         addrFromPPtr(ptr));
+    // printf("clear cache done\n");
 }
 
 /* Cleaning memory before page table walker access */

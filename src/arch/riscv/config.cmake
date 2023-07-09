@@ -27,6 +27,16 @@ config_option(
     DEPENDS "KernelArchRiscV"
 )
 
+config_option(
+    KernelRiscvUseClintMtime RISCV_USE_CLINT_MTIME "When reading the hardware \
+    from the hardware, directly access the CLINT timer register (mtime) instead \
+    of using the rdtime instruction. This is only an optimization for platforms \
+    where executing the rdtime instruction results in a trap into M-mode software
+    which then accesses the CLINT timer register."
+    DEFAULT OFF
+    DEPENDS "KernelArchRiscV"
+)
+
 # Until RISC-V has instructions to count leading/trailing zeros, we provide
 # library implementations. Platforms that implement the bit manipulation
 # extension can override these settings to remove the library functions from

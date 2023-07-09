@@ -14,6 +14,7 @@ if(KernelPlatformAriane)
     config_set(KernelRiscVPlatform RISCV_PLAT "ariane")
     config_set(KernelPlatformFirstHartID FIRST_HART_ID 0)
     config_set(KernelOpenSBIPlatform OPENSBI_PLATFORM "fpga/ariane")
+    config_set(KernelRiscvUseClintMtime "TRUE")
     list(APPEND KernelDTSList "tools/dts/ariane.dts")
     list(APPEND KernelDTSList "src/plat/ariane/overlay-ariane.dts")
     # This is an experimental platform that supports accessing peripherals, but

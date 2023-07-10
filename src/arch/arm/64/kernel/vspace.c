@@ -1965,12 +1965,12 @@ static exception_t decodeARMPageDirectoryInvocation(word_t invLabel, unsigned in
 }
 
 bool_t vaddrIsMapped(cap_t vspaceRootCap, vptr_t vaddr) {
-    if (!isValidNativeRoot(vspaceRootCap)) {
-        return false; 
+    if (vaddr >= USER_TOP) {
+        return true;
     }
 
-    if (vaddr >= PPTR_BASE && vaddr < PPTR_TOP) {
-        return true;
+    if (!isValidNativeRoot(vspaceRootCap)) {
+        return false; 
     }
 
 	vspace_root_t *vspaceRoot = cap_vtable_root_get_basePtr(vspaceRootCap);

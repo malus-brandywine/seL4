@@ -10,24 +10,31 @@
 #include <arch/model/smp.h>
 #include <stdint.h>
 #include <plat/machine/devices_gen.h>
-#include <plat/platform_gen.h>
 
-#define CLINT_MTIME_LO_OFFSET 0xbff8
-#define CLINT_MTIME_HI_OFFSET 0xbffc
+#define CLINT_MTIME_OFFSET 0xbff8
 
 static inline uint64_t riscv_read_time(void)
 {
+#ifdef CONFIG_RISCV_USE_CLINT_MTIME
+    uint64_t n = *(volatile uint64_t *)(CLINT_PPTR + CLINT_MTIME_OFFSET);
+    return n;
+#else
     word_t nH1, nL, nH2;
 
-    nH1 = *(volatile word_t *)(CLINT_PPTR + CLINT_MTIME_HI_OFFSET);
-    nL = *(volatile word_t *)(CLINT_PPTR + CLINT_MTIME_LO_OFFSET);
-    nH2 = *(volatile word_t *)(CLINT_PPTR + CLINT_MTIME_HI_OFFSET);
+    asm volatile(
+        "rdtimeh %0\n"
+        "rdtime  %1\n"
+        "rdtimeh %2\n"
+        : "=r"(nH1), "=r"(nL), "=r"(nH2));
+
     if (nH1 != nH2) {
         /* Ensure that the time is correct if there is a rollover in the
          * high bits between reading the low and high bits. */
-        nL = *(volatile word_t *)(CLINT_PPTR + CLINT_MTIME_LO_OFFSET);
+        asm volatile("rdtime  %0\n" : "=r"(nL));
     }
+
     return (((uint64_t)nH2) << 32) | nL;
+#endif
 }
 
 

@@ -31,6 +31,22 @@ void deleteASID(asid_t asid, vspace_root_t *vspace);
 
 bool_t vaddrIsMapped(cap_t cap, vptr_t vaddr);
 
+#ifdef CONFIG_PRINTING
+
+typedef struct readWordFromVSpace_ret {
+    exception_t status;
+    word_t value;
+} readWordFromVSpace_ret_t;
+
+typedef struct writeWordToVSpace_ret {
+    exception_t status;
+} writeWordToVSpace_ret_t;
+
+readWordFromVSpace_ret_t readWordFromVSpace(vspace_root_t *pd, word_t vaddr);
+writeWordToVSpace_ret_t writeWordToVSpace(vspace_root_t *pd, word_t vaddr, word_t value);
+
+#endif
+
 #ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
 hw_asid_t getHWASID(asid_t asid);
 #endif
@@ -89,7 +105,6 @@ static inline exception_t performASIDPoolInvocation(asid_t asid, asid_pool_t *po
     poolPtr->array[asid & MASK(asidLowBits)] = asid_map;
     return EXCEPTION_NONE;
 }
-
 
 #else
 

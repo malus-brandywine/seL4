@@ -1967,6 +1967,7 @@ static exception_t decodeARMPageDirectoryInvocation(word_t invLabel, unsigned in
     return performPageDirectoryInvocationMap(cap, cte, pude, pudSlot.pudSlot);
 }
 
+#ifdef CONFIG_GDB
 bool_t vaddrIsMapped(cap_t vspaceRootCap, vptr_t vaddr)
 {
     if (vaddr >= USER_TOP) {
@@ -1996,6 +1997,7 @@ bool_t vaddrIsMapped(cap_t vspaceRootCap, vptr_t vaddr)
 
     return false;
 }
+#endif /* CONFIG_GDB */
 
 static exception_t decodeARMPageTableInvocation(word_t invLabel, unsigned int length,
                                                 cte_t *cte, cap_t cap, word_t *buffer)
